@@ -1,56 +1,62 @@
+#include "imgui.h"
+#include "imgui-SFML.h"
+#include "Profiler.hpp"
+#include "Balls.hpp"
+
 #include <SFML/Graphics.hpp>
 
-#include <imgui.h>
-#include <imgui-SFML.h>
 
-int main()
-{
-    sf::RenderWindow window(
-        sf::VideoMode(800, 600),
-        "SFML + ImGui Test"
-    );
+int main() {
+    sf::RenderWindow window(sf::VideoMode({1280, 720}), "Profiler Only");
+    window.setFramerateLimit(60);
+    window.setVerticalSyncEnabled(true);
 
+    sf::Vector2u windowSize = window.getSize();
+    BallGame * game = new BallGame(windowSize);
+
+    if (!ImGui::SFML::Init(window))
+        return -1;
+
+    Profiler profiler;
     sf::Clock deltaClock;
+    int iterations = 100000;
 
-    ImGui::SFML::Init(window);
-
-    while (window.isOpen())
-    {
-        sf::Event event;
-
-        while (window.pollEvent(event))
-        {
-            ImGui::SFML::ProcessEvent(window, event);
-
-            if (event.type == sf::Event::Closed)
-            {
+    while (window.isOpen()) {
+        while (const std::optional event = window.pollEvent()) {
+            ImGui::SFML::ProcessEvent(window, *event);
+            if (event->is<sf::Event::Closed>())
                 window.close();
-            }
         }
 
-        ImGui::SFML::Update(window, deltaClock.restart());
+        sf::Time deltaTime = deltaClock.restart();
+        float deltatime = deltaTime.asSeconds();
+        ImGui::SFML::Update(window, deltaTime);
 
-        // ImGui UI
-        ImGui::Begin("Test Window");
-
-        ImGui::Text("SFML + ImGui is working!");
-
-        if (ImGui::Button("Click Me"))
         {
-            // Button clicked
+            //imgui show profiler
+            ImGui::Begin("Controls");
+            if (ImGui::Button("Clear Profiler History")) {
+                profiler.clear();
+            }
+            ImGui::End();
         }
 
-        ImGui::End();
+        profiler.renderImGui();
 
-        // SFML rendering
-        window.clear(sf::Color(30, 30, 30));
+        {
+            PROFILE(profiler, "Physics update");
+            game->updateBalls(deltatime);
+        }
 
-        ImGui::SFML::Render(window);
-
-        window.display();
+        {
+            PROFILE(profiler, "Rendering");
+            window.clear(sf::Color::Black);
+            ImGui::SFML::Render(window);
+            game->drawBalls(window);
+            window.display();
+        }
     }
 
     ImGui::SFML::Shutdown();
-
     return 0;
 }
