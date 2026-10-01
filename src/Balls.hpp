@@ -9,6 +9,7 @@
 
 #include "SpatialHash.h"
 #include "Ball.hpp"
+#include "ThreadPool.h"
 
 class BallGame {
 private:
@@ -22,9 +23,10 @@ private:
     std::uniform_int_distribution<int> colorDist;
     std::uniform_real_distribution<float> radiusDist;
     sf::Vector2u windowSize;
+    ThreadPool pool;
 
 public:
-    BallGame(sf::Vector2u windowSize) : spatialHash(windowSize,50.0f) {
+    BallGame(sf::Vector2u windowSize) : spatialHash(windowSize,50.0f), pool(4) {
         gen = std::mt19937(rd());
         posDist = std::uniform_real_distribution<float>(5.0f, 795.0f);
         velDist = std::uniform_real_distribution<float>(-200.0f, 200.0f);
@@ -44,20 +46,45 @@ public:
         }
     }
 
-    void updateBalls(float deltaTime) {
+
+
+    void updateBalls(float deltaTime)
+    {
+        const size_t ballCount = balls.size();
+
+        if (ballCount == 0)
+            return;
+
+        const size_t chunkSize = (ballCount + 3) / 4;
+
+        for (size_t i = 0; i < ballCount; i += chunkSize)
+        {
+            const size_t start = i;
+            const size_t end = std::min(i + chunkSize, ballCount);
+
+            pool.enqueue([this, start, end, deltaTime]()
+            {
+                for (size_t j = start; j < end; ++j)
+                {
+                    balls[j].shape.move(
+                        balls[j].velocity * deltaTime
+                    );
+                }
+            });
+        }
+
+        pool.waitUntilFinished();
 
         spatialHash.clearHash();
 
-        for (auto& ball : balls) {
-            ball.shape.move(ball.velocity * deltaTime);
+        for (auto& ball : balls)
+        {
             spatialHash.insertObject(&ball);
         }
 
-        spatialHash.collisionHandeling();
+        spatialHash.collisionHandeling(pool);
+
         spatialHash.wallCollisionHandeling();
-
-
-
     }
 
     void drawBalls( sf::RenderWindow& window ) const

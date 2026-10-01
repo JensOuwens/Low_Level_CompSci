@@ -73,6 +73,8 @@ FetchContent_MakeAvailable(imgui-sfml)
 add_executable(MyGame
         src/main.cpp
         src/SpatialHash.cpp
+        Src/ThreadPool.cpp
+        Src/ThreadPool.h
 )
 
 target_include_directories(MyGame PRIVATE

@@ -26,29 +26,107 @@ void SpatialHash::clearHash() {
     grid.clear();
 }
 
-void SpatialHash::collisionHandeling() {
-    for (auto& [cellKey, bucket] : grid) {
-        //bucket collision handling
-        for (size_t i = 0; i < bucket.size(); ++i) {
-            for (size_t j = i + 1; j < bucket.size(); ++j) {
-                handleCollision(bucket[i], bucket[j]);
-            }
-        }
-        //neighbouring cell handeling
-        for (int dx = -1; dx <= 1; ++dx) {
-            for (int dy = -1; dy <= 1; ++dy) {
-                if (dx == 0 && dy == 0) continue;
-                std::pair<int,int> neighborKey(cellKey.first + dx, cellKey.second + dy);
-                auto it = grid.find(neighborKey);
-                if (it != grid.end()) {
-                    auto& neighborBucket = it->second;
-                    for (auto* ballA : bucket) {
-                        for (auto* ballB : neighborBucket) {
-                            handleCollision(ballA, ballB);
+
+void SpatialHash::collisionHandeling(ThreadPool& pool)
+{
+    using CellKey = std::pair<int, int>;
+    using CollisionPair = std::pair<Ball*, Ball*>;
+
+    std::vector<CellKey> cellKeys;
+    cellKeys.reserve(grid.size());
+
+    for (const auto& [cellKey, bucket] : grid)
+    {
+        cellKeys.push_back(cellKey);
+    }
+
+    if (cellKeys.empty())
+        return;
+
+    const size_t chunkSize = 32;
+
+    const size_t numChunks =
+        (cellKeys.size() + chunkSize - 1) / chunkSize;
+
+    std::vector<std::vector<CollisionPair>> results(numChunks);
+
+    const auto& readOnlyGrid = grid;
+
+    for (size_t chunk = 0; chunk < numChunks; ++chunk)
+    {
+        pool.enqueue([&, chunk]()
+        {
+            const size_t start = chunk * chunkSize;
+
+            const size_t end = std::min(
+                start + chunkSize,
+                cellKeys.size()
+            );
+
+            auto& localResults = results[chunk];
+
+            for (size_t i = start; i < end; ++i)
+            {
+                const CellKey& cellKey = cellKeys[i];
+
+                const auto& bucket = readOnlyGrid.at(cellKey);
+
+                for (size_t a = 0; a < bucket.size(); ++a)
+                {
+                    for (size_t b = a + 1; b < bucket.size(); ++b)
+                    {
+                        localResults.emplace_back(
+                            bucket[a],
+                            bucket[b]
+                        );
+                    }
+                }
+
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    for (int dy = -1; dy <= 1; ++dy)
+                    {
+                        if (dx == 0 && dy == 0)
+                            continue;
+
+                        CellKey neighborKey(
+                            cellKey.first + dx,
+                            cellKey.second + dy
+                        );
+
+                        if (!(cellKey < neighborKey))
+                            continue;
+
+                        auto it = readOnlyGrid.find(neighborKey);
+
+                        if (it == readOnlyGrid.end())
+                            continue;
+
+                        const auto& neighborBucket = it->second;
+
+                        for (Ball* ballA : bucket)
+                        {
+                            for (Ball* ballB : neighborBucket)
+                            {
+                                localResults.emplace_back(
+                                    ballA,
+                                    ballB
+                                );
+                            }
                         }
                     }
                 }
             }
+        });
+    }
+
+    pool.waitUntilFinished();
+
+    for (const auto& localResults : results)
+    {
+        for (const auto& [ballA, ballB] : localResults)
+        {
+            handleCollision(ballA, ballB);
         }
     }
 }

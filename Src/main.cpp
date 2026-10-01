@@ -12,7 +12,7 @@ int main() {
     window.setVerticalSyncEnabled(true);
 
     sf::Vector2u windowSize = window.getSize();
-    BallGame * game = new BallGame(windowSize);
+    BallGame game(windowSize);
 
     if (!ImGui::SFML::Init(window))
         return -1;
@@ -45,14 +45,14 @@ int main() {
 
         {
             PROFILE(profiler, "Physics update");
-            game->updateBalls(deltatime);
+            game.updateBalls(deltatime);
         }
 
         {
             PROFILE(profiler, "Rendering");
             window.clear(sf::Color::Black);
             ImGui::SFML::Render(window);
-            game->drawBalls(window);
+            game.drawBalls(window);
             window.display();
         }
     }
