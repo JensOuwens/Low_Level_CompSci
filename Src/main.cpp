@@ -6,6 +6,24 @@
 
 int main()
 {
+    ConcurrentInventory inventory;
+
+    std::thread t1([&inventory]() {
+        for (int i = 0; i < 1000; i++)
+            inventory.AddItem("Sword");
+    });
+
+    std::thread t2([&inventory]() {
+        for (int i = 0; i < 1000; i++)
+            inventory.AddItem("Shield");
+    });
+
+    t1.join();
+    t2.join();
+
+    inventory.DisplayAllItems();
+
+    //unimportant imgui stuff
     sf::RenderWindow window(
         sf::VideoMode(800, 600),
         "SFML + ImGui Test"
@@ -31,14 +49,13 @@ int main()
 
         ImGui::SFML::Update(window, deltaClock.restart());
 
-        // ImGui UI
         ImGui::Begin("Test Window");
 
         ImGui::Text("SFML + ImGui is working!");
 
         if (ImGui::Button("Click Me"))
         {
-            // Button clicked
+
         }
 
         ImGui::End();

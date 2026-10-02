@@ -22,6 +22,8 @@ public:
 private:
     std::vector <std::string> items;
 
+    std::mutex itemsMutex;
+
 };
 
 
