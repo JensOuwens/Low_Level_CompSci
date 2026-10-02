@@ -65,6 +65,8 @@ FetchContent_MakeAvailable(ImGui-SFML)
 
 add_executable(MyGame
         src/main.cpp
+        Src/ConcurrentInventory.cpp
+        Src/ConcurrentInventory.h
 )
 
 target_link_libraries(MyGame PRIVATE
